@@ -235,8 +235,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     activeCount,
     expiringCount,
     expiredCount,
-    collectionRows,
-    duesRows,
+    collectionTotal,
+    duesTotal,
     todayAttendance,
     newEnquiryCount,
     expiringDocs,
@@ -247,10 +247,16 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     Member.countDocuments({ expiryDate: { $gt: endOfWindow } }),
     Member.countDocuments({ expiryDate: { $gte: startOfToday, $lte: endOfWindow } }),
     Member.countDocuments({ expiryDate: { $lt: startOfToday } }),
-    Payment.find({ status: "paid", paidOn: { $gte: monthRange.from, $lt: monthRange.to } })
-      .select("amount")
-      .lean(),
-    Member.find({ dues: { $gt: 0 } }).select("dues").lean(),
+    // Sums happen inside MongoDB. Pulling every paid row into memory to add it
+    // up in JS got slower as soon as the gym had a few hundred payments.
+    Payment.aggregate<{ total: number }>([
+      { $match: { status: "paid", paidOn: { $gte: monthRange.from, $lt: monthRange.to } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    Member.aggregate<{ total: number }>([
+      { $match: { dues: { $gt: 0 } } },
+      { $group: { _id: null, total: { $sum: "$dues" } } },
+    ]),
     Attendance.countDocuments({ date: todayKey }),
     Enquiry.countDocuments({ status: "new" }),
     Member.find({ expiryDate: { $gte: startOfToday, $lte: endOfWindow } })
@@ -273,8 +279,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     activeMembers: activeCount,
     expiringSoon: expiringCount,
     expired: expiredCount,
-    monthCollection: collectionRows.reduce((sum, row) => sum + row.amount, 0),
-    pendingDues: duesRows.reduce((sum, row) => sum + row.dues, 0),
+    monthCollection: collectionTotal[0]?.total ?? 0,
+    pendingDues: duesTotal[0]?.total ?? 0,
     todayAttendance,
     newEnquiries: newEnquiryCount,
     expiringList,
