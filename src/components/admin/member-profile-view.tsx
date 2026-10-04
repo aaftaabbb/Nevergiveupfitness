@@ -71,10 +71,15 @@ export function MemberProfileView({
   const [noteError, setNoteError] = useState<string | null>(null);
   const [notePending, setNotePending] = useState(false);
   const [removingPaymentId, setRemovingPaymentId] = useState<string | null>(null);
+  const [confirmPaymentId, setConfirmPaymentId] = useState<string | null>(null);
 
   const totalPaid = member.payments
     .filter((payment) => payment.status === "paid")
     .reduce((sum, payment) => sum + payment.amount, 0);
+
+  const confirmPayment = confirmPaymentId
+    ? member.payments.find((payment) => payment.id === confirmPaymentId)
+    : undefined;
 
   async function addNote(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,9 +121,18 @@ export function MemberProfileView({
 
   async function deletePayment(paymentId: string) {
     setRemovingPaymentId(paymentId);
-    await fetch(`/api/admin/payments?id=${paymentId}`, { method: "DELETE" });
-    setRemovingPaymentId(null);
-    router.refresh();
+    try {
+      const response = await fetch(`/api/admin/payments?id=${paymentId}`, { method: "DELETE" });
+      if (!response.ok) {
+        setRemovingPaymentId(null);
+        setConfirmPaymentId(null);
+        return;
+      }
+      setConfirmPaymentId(null);
+      router.refresh();
+    } finally {
+      setRemovingPaymentId(null);
+    }
   }
 
   return (
@@ -280,7 +294,7 @@ export function MemberProfileView({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => deletePayment(payment.id)}
+                      onClick={() => setConfirmPaymentId(payment.id)}
                       disabled={removingPaymentId === payment.id}
                       aria-label="Delete payment"
                       className="border border-line p-2 text-muted transition-colors hover:border-brand-red hover:text-brand-red"
@@ -394,6 +408,41 @@ export function MemberProfileView({
             Notes are visible only in this panel.
           </p>
         </form>
+      </Modal>
+
+      <Modal
+        open={confirmPaymentId !== null}
+        onClose={() => setConfirmPaymentId(null)}
+        title="Delete this payment record?"
+        description={
+          confirmPayment
+            ? `${formatRupees(confirmPayment.amount)} recorded on ${formatDate(confirmPayment.paidOn)} will be removed permanently and the member's total will change.`
+            : undefined
+        }
+        footer={
+          <div className="flex gap-3">
+            <Button
+              variant="danger"
+              fullWidth
+              onClick={() => confirmPaymentId && deletePayment(confirmPaymentId)}
+              disabled={removingPaymentId !== null}
+            >
+              {removingPaymentId !== null ? "Deleting…" : "Yes, delete payment"}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmPaymentId(null)}
+              disabled={removingPaymentId !== null}
+            >
+              Cancel
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          Payment records are kept for your accounting, so this cannot be undone. If the amount was
+          entered by mistake, cancel and add the correct payment instead.
+        </p>
       </Modal>
     </>
   );
