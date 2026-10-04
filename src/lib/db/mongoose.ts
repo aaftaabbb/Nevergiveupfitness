@@ -4,7 +4,9 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
   throw new Error(
-    "MONGODB_URI is missing. Copy .env.example to .env.local and paste your MongoDB Atlas connection string.",
+    "MONGODB_URI is missing. Locally: add it to .env.local (see .env.example). " +
+      "On Vercel: Project -> Settings -> Environment Variables, add MONGODB_URI and MONGODB_DB " +
+      "for all environments, then redeploy.",
   );
 }
 

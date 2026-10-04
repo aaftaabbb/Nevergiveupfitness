@@ -8,7 +8,10 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 
 if (!SESSION_SECRET) {
   throw new Error(
-    "SESSION_SECRET is missing. Generate one with: openssl rand -base64 32 and add it to .env.local",
+    "SESSION_SECRET is missing. Locally: add it to .env.local (see .env.example). " +
+      "On Vercel: Project -> Settings -> Environment Variables, add SESSION_SECRET for all " +
+      "environments, then redeploy. Generate a value with: " +
+      'node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"',
   );
 }
 
